@@ -24,8 +24,8 @@ class CheckpointHook(Hook):
             self.out_dir = trainer.work_dir
 
         trainer.save_checkpoint(
-            out_dir = self.out_dir, 
+            out_dir = self.out_dir,
             filename_tmpl = f'{trainer.config.model.name}_epoch_{trainer.epoch}',
-            save_optimizer=self.save_optimizer, 
+            save_optimizer=self.save_optimizer,
             **self.args
         )

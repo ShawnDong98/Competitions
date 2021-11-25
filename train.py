@@ -8,11 +8,10 @@ import torch.nn.functional as F
 
 import pandas as pd
 from sklearn.model_selection import StratifiedKFold
-from sklearn.metrics import f1_score
 
 from config import config
-from dataset import FackFaceDetLoader
-from model import FackFaceDetModel
+from dataset import PetfinderLoader, mixup
+from model import PetfinderModel
 
 from engine.trainer.trainer import Trainer
 from engine.trainer.utils import seed_everything
@@ -20,45 +19,49 @@ from engine.utils.path import mkdir_or_exist
 
 
 def batch_processor(model, batch, train_mode):
-    img, label = batch
-    img = img.float().cuda()
-    label = label.float().cuda()
-    pred = model(img).squeeze(1)
-    loss = F.binary_cross_entropy_with_logits(pred, label)
-    f1_pred = pred.sigmoid().clone()
-    f1_pred[f1_pred > 0.5] =  2
-    f1_pred[f1_pred <= 0.5] = 1
-    f1 = f1_score((label+1).cpu().numpy(), f1_pred.detach().cpu().numpy())
+    image, label, filename = batch['image'], batch['label'], batch['filename']
+    image = image.float().cuda()
+    label = label.float().cuda() / 100.
+    logit = model(image).squeeze(1)
+    loss = F.binary_cross_entropy_with_logits(logit, label)
+
+    pred =  logit.sigmoid().detach().cpu() * 100
+    label  =  label.detach().cpu() * 100
+
+    mse = torch.sqrt(((label - pred) ** 2).mean())
+
     log_vars = OrderedDict()
     log_vars['loss'] = loss.item()
-    log_vars['f1_score'] = f1
-    outputs = dict(loss=loss, log_vars=log_vars, num_samples=img.size(0))
+    log_vars['mse'] = mse.item()
+    log_vars['pred'] = pred
+    log_vars['label'] = label
+    outputs = dict(loss=loss, log_vars=log_vars, num_samples=image.size(0))
     return outputs
 
 def main():
     seed_everything()
-    df = pd.read_csv(os.path.join(config.root, 'train.csv'), sep='\t') if not config.debug else pd.read_csv(os.path.join(config.root, 'train.csv'), sep='\t')[:1000]
+    df = pd.read_csv(os.path.join(config.root, 'train.csv')) if not config.debug else pd.read_csv(os.path.join(config.root, 'train.csv'))[:1000]
 
-    df['fnames'] = df['fnames'].apply(lambda x: os.path.join(config.root, 'image', 'train', x))
-    skf = StratifiedKFold(n_splits=config.n_splits, shuffle=True, random_state=config.seed)    
+    df['file_path'] = df['Id'].apply(lambda x: os.path.join(config.root, 'train', x + '.jpg'))
+    skf = StratifiedKFold(n_splits=config.n_splits, shuffle=True, random_state=config.seed)
 
-    for fold, (train_idx, val_idx) in enumerate(skf.split(df['fnames'], df['label'])):
+    for fold, (train_idx, val_idx) in enumerate(skf.split(df['file_path'], df['Pawpularity'])):
         train_df = df.loc[train_idx].reset_index(drop=True)
         val_df = df.loc[val_idx].reset_index(drop=True)
 
-        Loader = FackFaceDetLoader(train_df, val_df, config)
+        Loader = PetfinderLoader(train_df, val_df, config)
 
-        model = FackFaceDetModel(config)
+        model = PetfinderModel(config)
 
         if torch.cuda.is_available():
             model = nn.DataParallel(model).cuda()
 
-        work_dir = os.path.join(config.work_dir, f'version_{fold}')
+        work_dir = os.path.join(config.work_dir, config.model.name + 'test',   f'version_{fold}')
         mkdir_or_exist(work_dir)
 
         trainer = Trainer(
             config,
-            model, 
+            model,
             batch_processor,
             config.optimizer,
             work_dir,

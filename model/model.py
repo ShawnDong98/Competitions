@@ -4,12 +4,12 @@ import torch.nn.functional as F
 import timm
 
 
-class FackFaceDetModel(nn.Module):
+class PetfinderModel(nn.Module):
     def __init__(
         self, 
         cfg
     ):
-        super(FackFaceDetModel, self).__init__()
+        super(PetfinderModel, self).__init__()
         self._cfg = cfg
         self.backbone = timm.create_model(self._cfg.model.name, pretrained=True, num_classes=0)
         num_features = self.backbone.num_features

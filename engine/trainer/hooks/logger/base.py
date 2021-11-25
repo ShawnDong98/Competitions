@@ -31,7 +31,7 @@ class LoggerHook(Hook):
 
     def before_train_epoch(self, trainer):
         trainer.log_buffer.clear()  # clear logs of last epoch
-    
+
     def before_val_epoch(self, trainer):
         trainer.log_buffer.clear()  # clear logs of last epoch
         self.log(trainer)
@@ -51,6 +51,8 @@ class LoggerHook(Hook):
     def after_train_epoch(self, trainer):
         if trainer.log_buffer.ready:
             self.log(trainer)
+            if self.reset_flag:
+                trainer.log_buffer.clear_output()
 
     def after_val_epoch(self, trainer):
         trainer.log_buffer.average()

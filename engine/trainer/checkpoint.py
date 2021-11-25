@@ -31,7 +31,7 @@ def load_state_dict(module, state_dict, strict=False, logger=None):
         if isinstance(param, torch.nn.Parameter):
             # backwards compatibility for serialized parameters
             param = param.data
-        
+
         try:
             own_state[name].copy_(param)
         except Exception:
@@ -86,7 +86,7 @@ def load_checkpoint(
         if not osp.isfile(filename):
             raise IOError('{} is not a checkpoint file'.format(filename))
         chekcpoint = torch.load(filename, map_location=map_location)
-    
+
     # get state_dict from checkpoint
     if isinstance(checkpoint, OrderedDict):
         state_dict = checkpoint
@@ -96,7 +96,7 @@ def load_checkpoint(
         raise RuntimeError(
             'No state_dict found in checkpoint file {}'.format(filename)
         )
-    
+
     # strip prefix of state_dict
     if list(state_dict.keys())[0].startwith('module.'):
         state_dict = {k[7:]: v for k, v in checkpoint['state_dict'].items()}
@@ -121,7 +121,7 @@ def weights_to_cpu(state_dict):
     return state_dict_cpu
 
 
-def save_checkpoint(model, filename, optimizer=None, meta=None): 
+def save_checkpoint(model, filename, optimizer=None, meta=None):
     """Save checkpoint to file.
     The checkpoint will have 3 fields: ``meta``, ``state_dict`` and
     ``optimizer``. By default ``meta`` will contain version and time info.
@@ -140,7 +140,7 @@ def save_checkpoint(model, filename, optimizer=None, meta=None):
     mkdir_or_exist(osp.dirname(filename))
     if hasattr(model, 'module'):
         model = model.module
-    
+
     checkpoint = {
         'meta': meta,
         'state_dict': weights_to_cpu(model.state_dict())

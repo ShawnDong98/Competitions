@@ -82,7 +82,7 @@ class Trainer(object):
     def rank(self):
         """int: Rank of current process. (distributed training)"""
         return self._rank
-    
+
     @property
     def world_size(self):
         """int: Number of processes participating in the job.
@@ -98,7 +98,7 @@ class Trainer(object):
     def epoch(self):
         """int: Current epoch."""
         return self._epoch
-    
+
     @property
     def iter(self):
         """int: Current iteration."""
@@ -119,7 +119,7 @@ class Trainer(object):
         """int: Maximum training iterations."""
         return self._max_iters
 
-    
+
     def init_optimizer(self, optimizer):
         """Init the optimizer.
         Args:
@@ -186,7 +186,7 @@ class Trainer(object):
             raise RuntimeError(
                 'lr is not applicable because optimizer does not exist.')
         return [group['lr'] for group in self.optimizer.param_groups]
-    
+
     def register_hook(self, hook, priority='NORMAL'):
         """Register a hook into the hook list.
         Args:
@@ -222,7 +222,7 @@ class Trainer(object):
     def call_hook(self, fn_name):
         for hook in self._hooks:
             getattr(hook, fn_name)(self)
-    
+
     def load_checkpoint(self, filename, map_location='cpu', strict=False):
         self.logger.info('load checkpoint from %s', filename)
         return load_checkpoint(self.model, filename, map_location, strict, self.logger)
@@ -244,7 +244,7 @@ class Trainer(object):
         optimizer = self.optimizer if save_optimizer else None
         save_checkpoint(self.model, filename, optimizer = optimizer, meta = meta)
         symlink(filename, linkname)
-    
+
     def train(self, data_loader, **kwargs):
         self.model.train()
         self.mode = 'train'
@@ -288,7 +288,7 @@ class Trainer(object):
             self.outputs = outputs
             self.call_hook('after_val_iter')
         self.call_hook('after_val_epoch')
-            
+
     def resume(self, checkpoint, resume_optimizer=True, map_location='default'):
         if map_location == 'default':
             device_id = torch.cuda.current_device()
@@ -300,12 +300,12 @@ class Trainer(object):
             checkpoint = self.load_checkpoint(
                 checkpoint, map_location=map_location
             )
-        
+
         self._epoch = checkpoint['meta']['epoch']
         self._iter = checkpoint['meta'['iter']]
         if 'optimizer' in checkpoint and resume_optimizer:
             self.optimizer.load_state_dict(checkpoint['optimizer'])
-        
+
         self.logger.info('resume epoch %d, iter %d', self.epoch, self.iter)
 
     def fit(self, data_loaders, workflow, max_epochs, **kwargs):
@@ -342,15 +342,15 @@ class Trainer(object):
                     epoch_runner = mode
                 else:
                     raise TypeError('mode in workflow must be a str or callable function, not {}'.format(type(mode)))
-                
+
                 for _ in range(epochs):
                     if mode == 'train' and self.epoch >= max_epochs:
                         return
                     epoch_runner(data_loaders[i], **kwargs)
-                
+
             if self.stop_training:
                 break
-                
+
         time.sleep(1) # wait for some hooks like loggers to finish
         self.call_hook('after_run')
 
@@ -360,7 +360,10 @@ class Trainer(object):
         elif isinstance(lr_config, dict):
             assert 'policy' in lr_config
             # from .hooks import lr_updater
-            hook_name = lr_config['policy'].title() + 'LrUpdaterHook'
+            policy_type = lr_config.pop('policy')
+            if policy_type == policy_type.lower():
+                hook_name = policy_type.title()
+            hook_name = policy_type + 'LrUpdaterHook'
             if not hasattr(lr_updater, hook_name):
                 raise ValueError('"{}" does not exist'.format(hook_name))
             hook_cls = getattr(lr_updater, hook_name)
@@ -375,8 +378,8 @@ class Trainer(object):
                 info, hooks, default_args=dict(interval=log_interval)
             )
             self.register_hook(logger_hook, priority="VERY_LOW")
-        
-    
+
+
     def register_training_hooks(
         self, 
         lr_config,
@@ -404,13 +407,5 @@ class Trainer(object):
             self.register_logger_hook(log_config)
         if earlystopping_config is not None:
             self.register_hook(self.build_hook(earlystopping_config, EarlyStoppingHook), priority='VERY_LOW')
-
-
-        
-                
-
-        
-
-
 
 

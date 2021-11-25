@@ -3,33 +3,35 @@ from box import Box
 
 config = {
     'debug': False,
+    'name': 'Petfinder',
     'seed': 3407,
     'n_splits': 5,
-    'epochs': 10,
-    'root': "../datasets/fackface_det/",
-    'image_size': 224,
+    'epochs': 5,
+    'root': "../datasets/kaggle/petfinder_clean",
+    'image_size_tta': 440,
+    'image_size': 384,
     'work_dir': './checkpoint',
     'log_level': 'INFO',
     'log_config': {
         'interval': 50,
         'hooks' : [
-            dict(name='WandBLoggerHook'),
+            dict(name='PetfinderLoggerHook'),
             # dict(name='TextLoggerHook'),
         ]
     },
     'model': {
-        'name': 'swin_large_patch4_window7_224',
+        'name': 'swin_large_patch4_window12_384',
         'output_dim': 1,
     },
     'train_loader': {
-        'batch_size': 80,
+        'batch_size': 16,
         'num_workers': 10,
         'shuffle': True,
         'drop_last': True,
         'pin_memory': False,
     },
     'val_loader': {
-        'batch_size': 80,
+        'batch_size': 16,
         'num_workers': 10,
         'shuffle': False,
         'drop_last': False,
@@ -42,28 +44,26 @@ config = {
     'optimizer_config': {
         'grad_clip': None
     },
-    'scheduler': {
-        'name': 'torch.optim.lr_scheduler.CosineAnnealingWarmRestarts',
-        'params': {
-            'T_0': 10,
-            'eta_min': 1e-4,
-        }
-    },
     'lr_config': {
-        'policy': 'step',
-        'step': 2,
+        'policy': 'CosineAnnealing',
+        'by_epoch': False,
+        'min_lr_ratio': 1e-2,
+        'warm_up': 'linear',
+        'warmup_ratio': 1e-3,
+        'warmup_iters': 50,
+        'warmup_by_epoch': False
     },
-    'loss': 'torch.nn.BCEWithLogitsLoss',
     'workflow': [('train', 1), ('val', 1)],
     'checkpoint_config': {
         'interval': 1,
     },
     'earlystopping_config': {
-        'monitor': 'f1_score',
+        'monitor': 'mse',
         'patience': 2,
-        'mode': 'max',
+        'mode': 'min',
     }
 }
+
 
 config = Box(config)
 pprint(config)

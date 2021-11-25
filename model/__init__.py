@@ -1,1 +1,1 @@
-from .model import FackFaceDetModel
+from .model import PetfinderModel
