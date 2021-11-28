@@ -4,11 +4,12 @@ import numpy as np
 
 class LogBuffer(object):
 
-    def __init__(self):
+    def __init__(self, average_filter):
         self.val_history = OrderedDict()
         self.n_history = OrderedDict()
         self.output = OrderedDict()
         self.ready = False
+        self.average_filter = average_filter
 
     def clear(self):
         self.val_history.clear()
@@ -32,7 +33,7 @@ class LogBuffer(object):
         """Average latest n value or all values"""
         assert n >= 0
         for key in self.val_history:
-            if key in ['pred', 'label']:
+            if key in self.average_filter:
                 continue
             values = np.array(self.val_history[key][-n:])
             nums = np.array(self.n_history[key][-n:])

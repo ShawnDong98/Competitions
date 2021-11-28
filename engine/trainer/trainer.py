@@ -1,6 +1,7 @@
 import logging
 import os.path as osp
 import time
+import copy
 
 import torch
 
@@ -8,7 +9,7 @@ from . import hooks
 from .log_buffer import LogBuffer
 from .hooks import (Hook, LrUpdaterHook, CheckpointHook, IterTimerHook,
                     OptimizerHook, EarlyStoppingHook, lr_updater)
-from .checkpoint import load_checkpoint, save_checkpoint 
+from .checkpoint import load_checkpoint, save_checkpoint
 from .priority import get_priority
 from .utils import get_dist_info, get_host_info, get_time_str, obj_from_dict
 from ..utils.misc import is_str, is_list_of
@@ -61,7 +62,7 @@ class Trainer(object):
 
         self._rank, self._world_size = get_dist_info()
         self.logger = self.init_logger(work_dir, log_level)
-        self.log_buffer = LogBuffer()
+        self.log_buffer = LogBuffer(config.log_average_filter)
 
         self.mode = None
         self._hooks = []
@@ -134,8 +135,8 @@ class Trainer(object):
         """
         if isinstance(optimizer, dict):
             optimizer = obj_from_dict(
-                optimizer, 
-                torch.optim, 
+                optimizer,
+                torch.optim,
                 dict(params=self.model.parameters())
             )
         elif not isinstance(optimizer, torch.optim.Optimizer):
@@ -249,7 +250,6 @@ class Trainer(object):
         self.model.train()
         self.mode = 'train'
         self.data_loader = data_loader
-        self._max_iters = self._max_epochs * len(data_loader)
         self.call_hook('before_train_epoch')
         for i, data_batch in enumerate(data_loader):
             self._inner_iter = i
@@ -324,6 +324,7 @@ class Trainer(object):
         assert len(data_loaders) == len(workflow)
 
         self._max_epochs = max_epochs
+        self._max_iters = self._max_epochs * len(data_loaders[0])
         work_dir = self.work_dir if self.work_dir is not None else 'NONE'
         self.logger.info('Starting running, host: %s, work_dir: %s', get_host_info(), work_dir)
         self.logger.info('workflow: %s, max: %d epochs', workflow, max_epochs)
@@ -360,7 +361,8 @@ class Trainer(object):
         elif isinstance(lr_config, dict):
             assert 'policy' in lr_config
             # from .hooks import lr_updater
-            policy_type = lr_config.pop('policy')
+            lr_config_cp = copy.deepcopy(lr_config)
+            policy_type = lr_config_cp.pop('policy')
             if policy_type == policy_type.lower():
                 hook_name = policy_type.title()
             hook_name = policy_type + 'LrUpdaterHook'

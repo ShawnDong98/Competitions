@@ -1,6 +1,6 @@
 from __future__ import division
 import numbers
-from mathim import cos, pi
+from math import cos, pi
 
 from .hook import Hook
 
@@ -79,7 +79,7 @@ class LrUpdaterHook(Hook):
                 self._set_lr(trainer, self.regular_lr)
             else:
                 warmup_lr = self.get_warmup_lr(cur_iter)
-                self.set_lr(trainer, warmup_lr)
+                self._set_lr(trainer, warmup_lr)
         elif self.by_epoch:
             if self.warmup is None and cur_iter > self.warmup_iters:
                 return
@@ -315,6 +315,133 @@ class CyclicLrUpdaterHook(LrUpdaterHook):
                                         base_lr * end_ratio,
                                         progress / (end_iter - start_iter))
 
+
+
+class OneCycleLrUpdaterHook(LrUpdaterHook):
+    """One Cycle LR Scheduler
+    The 1cycle learning rate policy changes the learning rate after every
+    batch. The one cycle learning rate policy is described in
+    https://arxiv.org/pdf/1708.07120.pdf
+    Args:
+        max_lr (float or list): Upper learning rate boundaries in the cycle
+            for each parameter group.
+        total_steps (int, optional): The total number of steps in the cycle.
+            Note that if a value is not provided here, it will be the max_iter
+            of trainer. Default: None.
+        pct_start (float): The percentage of the cycle (in number of steps)
+            spent increasing the learning rate.
+            Default: 0.3
+        anneal_strategy (str): {'cos', 'linear'}
+            Specifies the annealing strategy: 'cos' for cosine annealing,
+            'linear' for linear annealing.
+            Default: 'cos'
+        div_factor (float): Determines the initial learning rate via
+            initial_lr = max_lr/div_factor
+            Default: 25
+        final_div_factor (float): Determines the minimum learning rate via
+            min_lr = initial_lr/final_div_factor
+            Default: 1e4
+        three_phase (bool): If three_phase is True, use a third phase of the
+            schedule to annihilate the learning rate according to
+            final_div_factor instead of modifying the second phase (the first
+            two phases will be symmetrical about the step indicated by
+            pct_start).
+            Default: False
+    """
+
+    def __init__(self,
+                 max_lr,
+                 total_steps=None,
+                 pct_start=0.3,
+                 anneal_strategy='cos',
+                 div_factor=25,
+                 final_div_factor=1e4,
+                 three_phase=False,
+                 **kwargs):
+        # validate by_epoch, currently only support by_epoch = False
+        if 'by_epoch' not in kwargs:
+            kwargs['by_epoch'] = False
+        else:
+            assert not kwargs['by_epoch'], \
+                'currently only support "by_epoch" = False'
+        if not isinstance(max_lr, (numbers.Number, list, dict)):
+            raise ValueError('the type of max_lr must be the one of list or '
+                             f'dict, but got {type(max_lr)}')
+        self._max_lr = max_lr
+        if total_steps is not None:
+            if not isinstance(total_steps, int):
+                raise ValueError('the type of total_steps must be int, but'
+                                 f'got {type(total_steps)}')
+            self.total_steps = total_steps
+        # validate pct_start
+        if pct_start < 0 or pct_start > 1 or not isinstance(pct_start, float):
+            raise ValueError('expected float between 0 and 1 pct_start, but '
+                             f'got {pct_start}')
+        self.pct_start = pct_start
+        # validate anneal_strategy
+        if anneal_strategy not in ['cos', 'linear']:
+            raise ValueError('anneal_strategy must be one of "cos" or '
+                             f'"linear", instead got {anneal_strategy}')
+        elif anneal_strategy == 'cos':
+            self.anneal_func = annealing_cos
+        elif anneal_strategy == 'linear':
+            self.anneal_func = annealing_linear
+        self.div_factor = div_factor
+        self.final_div_factor = final_div_factor
+        self.three_phase = three_phase
+        self.lr_phases = []  # init lr_phases
+        super(OneCycleLrUpdaterHook, self).__init__(**kwargs)
+
+    def before_run(self, trainer):
+        if hasattr(self, 'total_steps'):
+            total_steps = self.total_steps
+        else:
+            total_steps = trainer.max_iters
+        if total_steps < trainer.max_iters:
+            raise ValueError(
+                'The total steps must be greater than or equal to max '
+                f'iterations {trainer.max_iters} of trainer, but total steps '
+                f'is {total_steps}.')
+
+        if isinstance(trainer.optimizer, dict):
+            self.base_lr = {}
+            for k, optim in trainer.optimizer.items():
+                _max_lr = format_param(k, optim, self._max_lr)
+                self.base_lr[k] = [lr / self.div_factor for lr in _max_lr]
+                for group, lr in zip(optim.param_groups, self.base_lr[k]):
+                    group.setdefault('initial_lr', lr)
+        else:
+            k = type(trainer.optimizer).__name__
+            _max_lr = format_param(k, trainer.optimizer, self._max_lr)
+            self.base_lr = [lr / self.div_factor for lr in _max_lr]
+            for group, lr in zip(trainer.optimizer.param_groups, self.base_lr):
+                group.setdefault('initial_lr', lr)
+
+        if self.three_phase:
+            self.lr_phases.append(
+                [float(self.pct_start * total_steps) - 1, 1, self.div_factor])
+            self.lr_phases.append([
+                float(2 * self.pct_start * total_steps) - 2, self.div_factor, 1
+            ])
+            self.lr_phases.append(
+                [total_steps - 1, 1, 1 / self.final_div_factor])
+        else:
+            self.lr_phases.append(
+                [float(self.pct_start * total_steps) - 1, 1, self.div_factor])
+            self.lr_phases.append(
+                [total_steps - 1, self.div_factor, 1 / self.final_div_factor])
+
+    def get_lr(self, trainer, base_lr):
+        curr_iter = trainer.iter
+        start_iter = 0
+        for i, (end_iter, start_lr, end_lr) in enumerate(self.lr_phases):
+            if curr_iter <= end_iter:
+                pct = (curr_iter - start_iter) / (end_iter - start_iter)
+                lr = self.anneal_func(base_lr * start_lr, base_lr * end_lr,
+                                      pct)
+                break
+            start_iter = end_iter
+        return lr
 
 def annealing_cos(start, end, factor, weight=1):
     """Calculate annealing cos learning rate.

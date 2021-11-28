@@ -124,8 +124,6 @@ class PetfinderLoader():
         dataset = self.__create_dataset(mode="test")
         return DataLoader(dataset, **self._cfg.val_loader)
 
-
-
 def mixup(x:torch.Tensor, y: torch.Tensor, alpha: float=1.0):
     assert alpha > 0, "alpha should be larger than 0"
     assert x.size(0) > 1, "Mixup cannot be applied to a single instance"

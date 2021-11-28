@@ -12,8 +12,9 @@ config = {
     'image_size': 384,
     'work_dir': './checkpoint',
     'log_level': 'INFO',
+    'log_average_filter':['pred', 'label'],
     'log_config': {
-        'interval': 50,
+        'interval': 10,
         'hooks' : [
             dict(name='PetfinderLoggerHook'),
             # dict(name='TextLoggerHook'),
@@ -21,6 +22,7 @@ config = {
     },
     'model': {
         'name': 'swin_large_patch4_window12_384',
+        'feature_dim': 128,
         'output_dim': 1,
     },
     'train_loader': {
@@ -39,19 +41,14 @@ config = {
     },
     'optimizer': {
         'name': 'AdamW',
-        'lr': 1e-5,
     },
     'optimizer_config': {
         'grad_clip': None
     },
     'lr_config': {
-        'policy': 'CosineAnnealing',
+        'policy': 'OneCycle',
+        'max_lr': 2e-5,
         'by_epoch': False,
-        'min_lr_ratio': 1e-2,
-        'warm_up': 'linear',
-        'warmup_ratio': 1e-3,
-        'warmup_iters': 50,
-        'warmup_by_epoch': False
     },
     'workflow': [('train', 1), ('val', 1)],
     'checkpoint_config': {

@@ -6,6 +6,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+import numpy as np
 import pandas as pd
 from sklearn.model_selection import StratifiedKFold
 
@@ -38,14 +39,17 @@ def batch_processor(model, batch, train_mode):
     outputs = dict(loss=loss, log_vars=log_vars, num_samples=image.size(0))
     return outputs
 
+
+
 def main():
     seed_everything()
     df = pd.read_csv(os.path.join(config.root, 'train.csv')) if not config.debug else pd.read_csv(os.path.join(config.root, 'train.csv'))[:1000]
-
+    num_bins = int(np.floor(1 + 3.322 * np.log2(len(df))))
+    df.loc[:, 'bins'] = pd.cut(df['Pawpularity'], bins=num_bins, labels=False)
     df['file_path'] = df['Id'].apply(lambda x: os.path.join(config.root, 'train', x + '.jpg'))
     skf = StratifiedKFold(n_splits=config.n_splits, shuffle=True, random_state=config.seed)
 
-    for fold, (train_idx, val_idx) in enumerate(skf.split(df['file_path'], df['Pawpularity'])):
+    for fold, (train_idx, val_idx) in enumerate(skf.split(df['file_path'], df['bins'])):
         train_df = df.loc[train_idx].reset_index(drop=True)
         val_df = df.loc[val_idx].reset_index(drop=True)
 
@@ -56,7 +60,8 @@ def main():
         if torch.cuda.is_available():
             model = nn.DataParallel(model).cuda()
 
-        work_dir = os.path.join(config.work_dir, config.model.name + 'test',   f'version_{fold}')
+        work_dir = os.path.join(config.work_dir,
+                                config.model.name + '_1129',   f'version_{fold}')
         mkdir_or_exist(work_dir)
 
         trainer = Trainer(
@@ -77,7 +82,6 @@ def main():
         )
 
         trainer.fit([Loader.train_dataloader(), Loader.val_dataloader()], config.workflow, config.epochs)
-
 
 if __name__ == "__main__":
     main()

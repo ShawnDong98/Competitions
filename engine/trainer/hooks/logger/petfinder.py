@@ -1,3 +1,4 @@
+import torch
 import wandb
 from .base import LoggerHook
 
@@ -90,7 +91,7 @@ class PetfinderLoggerHook(LoggerHook):
     def after_val_epoch(self, trainer):
 
         trainer.log_buffer.average()
-        preds = trainer,log_buffer['pred']
-        labels = trainer.log_buffer['label']
-        trainer.log_buffer['mse'] = torch.sqrt(((preds - labels) ** 2).mean())
+        preds = torch.cat(trainer.log_buffer.val_history['pred'])
+        labels = torch.cat(trainer.log_buffer.val_history['label'])
+        trainer.log_buffer.output['mse'] = torch.sqrt(((preds - labels) ** 2).mean())
         self.log(trainer)
