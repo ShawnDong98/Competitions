@@ -42,9 +42,9 @@ def batch_processor(model, batch, train_mode):
 
 
 def main():
-    seed_everything()
+    seed_everything(config.seed)
     df = pd.read_csv(os.path.join(config.root, 'train.csv')) if not config.debug else pd.read_csv(os.path.join(config.root, 'train.csv'))[:1000]
-    num_bins = int(np.floor(1 + 3.322 * np.log2(len(df))))
+    num_bins = int(np.floor(1 + 3.3 * np.log2(len(df))))
     df.loc[:, 'bins'] = pd.cut(df['Pawpularity'], bins=num_bins, labels=False)
     df['file_path'] = df['Id'].apply(lambda x: os.path.join(config.root, 'train', x + '.jpg'))
     skf = StratifiedKFold(n_splits=config.n_splits, shuffle=True, random_state=config.seed)
@@ -61,7 +61,7 @@ def main():
             model = nn.DataParallel(model).cuda()
 
         work_dir = os.path.join(config.work_dir,
-                                config.model.name + '_1129',   f'version_{fold}')
+                                config.model.name + '_1202',   f'version_{fold}')
         mkdir_or_exist(work_dir)
 
         trainer = Trainer(
@@ -78,6 +78,7 @@ def main():
             optimizer_config = config.optimizer_config,
             checkpoint_config = config.checkpoint_config,
             log_config = config.log_config,
+            momentum_config = config.momentum_config,
             earlystopping_config = config.earlystopping_config
         )
 

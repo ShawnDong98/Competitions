@@ -1,8 +1,30 @@
 import wandb
+from ...utils import master_only
 from .base import LoggerHook
 
 
 class WandBLoggerHook(LoggerHook):
+    def __init__(
+        self,
+        init_kwargs = None,
+        interval = 10,
+        ignore_last = True,
+        reset_flag = True
+    ):
+        super().__init__(interval, ignore_last, reset_flag)
+        self.import_wandb()
+        self.init_kwargs = init_kwargs
+
+    def import_wandb(self):
+        try:
+            import wandb
+        except ImportError:
+            raise ImportError(
+                "WandB is not installed. Please install WandB to use this hook."
+            )
+        self.wandb = wandb
+
+    @master_only
     def before_run(self, trainer):
         for hook in trainer.hooks[::-1]:
             if isinstance(hook, LoggerHook):
@@ -11,6 +33,7 @@ class WandBLoggerHook(LoggerHook):
         wandb.init(config=trainer.config, project=trainer.config.name, entity="shawndong98")
         wandb.watch(trainer.model, log_freq=self.interval)
 
+    @master_only
     def log(self, trainer):
         if trainer.mode == 'train':
             lr_str = ', '.join(

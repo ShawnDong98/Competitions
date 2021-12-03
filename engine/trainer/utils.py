@@ -73,7 +73,7 @@ def obj_from_dict(info, parrent=None, default_args=None):
     if default_args is not None:
         for name, value in default_args.items():
             args.setdefault(name, value)
-    
+
     return obj_type(**args)
 
 
@@ -84,7 +84,7 @@ def seed_everything(
 ):
     """Set random seed.
     Args:
-        seed (int): Seed to be used, default seed 3407, from the paper 
+        seed (int): Seed to be used, default seed 3407, from the paper
         Torch. manual_seed (3407) is all you need: On the influence of random seeds in deep learning architectures for computer vision[J]. arXiv preprint arXiv:2109.08203, 2021.
 
         deterministic (bool): Whether to set the deterministic option for

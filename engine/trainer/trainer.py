@@ -7,14 +7,14 @@ import torch
 
 from . import hooks
 from .log_buffer import LogBuffer
-from .hooks import (Hook, LrUpdaterHook, CheckpointHook, IterTimerHook,
+from .hooks import (HOOKS, Hook, LrUpdaterHook, CheckpointHook, IterTimerHook,
                     OptimizerHook, EarlyStoppingHook, lr_updater)
 from .checkpoint import load_checkpoint, save_checkpoint
 from .priority import get_priority
 from .utils import get_dist_info, get_host_info, get_time_str, obj_from_dict
 from ..utils.misc import is_str, is_list_of
 from ..utils.path import mkdir_or_exist, symlink
-
+from ..utils.registry import build_from_cfg
 
 class Trainer(object):
     """A training helper for PyTorch.
@@ -187,6 +187,31 @@ class Trainer(object):
             raise RuntimeError(
                 'lr is not applicable because optimizer does not exist.')
         return [group['lr'] for group in self.optimizer.param_groups]
+
+    def current_momentum(self):
+        """Get current momentums.
+        Returns:
+            list[float] | dict[str, list[float]]: Current momentums of all
+                param groups. If the runner has a dict of optimizers, this
+                method will return a dict.
+        """
+        def _get_momentum(optimizer):
+            momentums = []
+            for group in optimizer.param_groups:
+                if 'momentum' in group.keys():
+                    momentums.append(group['momentum'])
+                elif 'betas' in group.keys():
+                    momentums.append(group['betas'][0])
+                else:
+                    momentums.append(0)
+            return momentums
+
+        if self.optimizer is None:
+            raise RuntimeError('momentum is not applicable because optimizer does not exist.')
+        elif isinstance(self.optimizer, torch.optim.Optimizer):
+            return _get_momentum(self.optimizer)
+
+        return momentums
 
     def register_hook(self, hook, priority='NORMAL'):
         """Register a hook into the hook list.
@@ -369,9 +394,25 @@ class Trainer(object):
             if not hasattr(lr_updater, hook_name):
                 raise ValueError('"{}" does not exist'.format(hook_name))
             hook_cls = getattr(lr_updater, hook_name)
-            self.register_hook(hook_cls(**lr_config))
+            self.register_hook(hook_cls(**lr_config_cp))
         else:
             raise TypeError('lr_config must be either LrUpdaterHook or dict, not {}'.format(type(lr_config)))
+
+    def register_momentum_hook(self, momentum_config):
+        if momentum_config is None:
+            return
+        if isinstance(momentum_config, dict):
+            assert 'policy' in momentum_config
+            momentum_config_cp = copy.deepcopy(momentum_config)
+            policy_type = momentum_config_cp.pop('policy')
+            if policy_type == policy_type.lower():
+                policy_type = policy_type.title()
+            hook_name = policy_type + 'MomentumUpdaterHook'
+            momentum_config_cp['name'] = hook_name
+            hook = build_from_cfg(momentum_config_cp, HOOKS)
+        else:
+            hook = momentum_config
+        self.register_hook(hook)
 
     def register_logger_hook(self, log_config):
         log_interval = log_config['interval']
@@ -388,10 +429,12 @@ class Trainer(object):
         optimizer_config=None,
         checkpoint_config=None,
         log_config=None,
+        momentum_config=None,
         earlystopping_config=None
     ):
         """Register default hooks for training.
         - LrUpdaterHook
+        - MomentumUpdaterHook
         - OptimizerStepperHook
         - CheckpointSaverHook
         - IterTimerHook
@@ -402,6 +445,7 @@ class Trainer(object):
         if checkpoint_config is None:
             checkpoint_config = {}
         self.register_lr_hook(lr_config)
+        self.register_momentum_hook(momentum_config)
         self.register_hook(self.build_hook(optimizer_config, OptimizerHook))
         self.register_hook(self.build_hook(checkpoint_config, CheckpointHook))
         self.register_hook(IterTimerHook())

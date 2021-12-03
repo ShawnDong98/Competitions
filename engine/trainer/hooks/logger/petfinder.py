@@ -8,12 +8,15 @@ class PetfinderLoggerHook(LoggerHook):
         if trainer.mode == 'train':
             lr_str = ', '.join(
                 ['{:.7f}'.format(lr) for lr in trainer.current_lr()])
+            momentum_str = ', '.join(
+                ['{:.7f}'.format(momentum) for momentum in trainer.current_momentum()])
             log_str = 'Epoch [{}][{}/{}]\tlr: {}, '.format(
                 trainer.epoch + 1, trainer.inner_iter + 1,
                 len(trainer.data_loader), lr_str)
             wandb.log(
                 {
                     'lr': float(lr_str),
+                    'momentum': float(momentum_str),
                     'train_epoch': trainer.epoch + 1,
                }
             )

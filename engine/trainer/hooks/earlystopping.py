@@ -1,6 +1,7 @@
 import numpy as np
-from .hook import Hook
+from .hook import HOOKS, Hook
 
+@HOOKS.register_module()
 class EarlyStoppingHook(Hook):
     """Stop training when a monitored quantity has stopped improving.
     # Arguments

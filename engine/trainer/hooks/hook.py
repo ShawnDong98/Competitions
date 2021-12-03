@@ -1,3 +1,7 @@
+from ...utils.registry import Registry
+
+HOOKS = Registry('hook')
+
 class Hook(object):
     def before_run(self, trainer):
         pass
@@ -22,7 +26,7 @@ class Hook(object):
 
     def before_val_epoch(self, trainer):
         self.before_epoch(trainer)
-    
+
     def after_train_epoch(self, trainer):
         self.after_epoch(trainer)
 
@@ -31,7 +35,7 @@ class Hook(object):
 
     def before_train_iter(self, trainer):
         self.before_iter(trainer)
-    
+
     def before_val_iter(self, trainer):
         self.before_iter(trainer)
 
@@ -49,6 +53,6 @@ class Hook(object):
 
     def every_n_iters(self, trainer, n):
         return (trainer.iters + 1) % n == 0 if n > 0 else False
-    
+
     def end_of_epoch(self, trainer):
         return trainer.inner_iter + 1 == len(trainer.data_loader)

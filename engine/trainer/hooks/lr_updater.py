@@ -2,17 +2,30 @@ from __future__ import division
 import numbers
 from math import cos, pi
 
-from .hook import Hook
+from .hook import HOOKS, Hook
 
 
 class LrUpdaterHook(Hook):
+    """LR Scheduler in MMCV.
+    Args:
+        by_epoch (bool): LR changes epoch by epoch
+        warmup (string): Type of warmup used. It can be None(use no warmup),
+            'constant', 'linear' or 'exp'
+        warmup_iters (int): The number of iterations or epochs that warmup
+            lasts
+        warmup_ratio (float): LR used at the beginning of warmup equals to
+            warmup_ratio * initial_lr
+        warmup_by_epoch (bool): When warmup_by_epoch == True, warmup_iters
+            means the number of epochs that warmup lasts, otherwise means the
+            number of iteration that warmup lasts
+    """
     def __init__(
         self,
         by_epoch = True,
         warmup = None,
         warmup_iters = 0,
         warmup_ratio = 0.1,
-        **kwargs
+        warmup_by_epoch = False,
     ):
         # validate the "warmup" argument
         if warmup is not None:
@@ -31,6 +44,13 @@ class LrUpdaterHook(Hook):
         self.warmup = warmup
         self.warmup_iters = warmup_iters
         self.warmup_ratio = warmup_ratio
+        self.warmup_by_epoch = warmup_by_epoch
+
+        if self.warmup_by_epoch:
+            self.warmup_epochs = self.warmup_iters
+            self.warmup_iters = None
+        else:
+            self.warmup_epochs = None
 
         self.base_lr = []  # initial lr for all param groups
         self.regular_lr = [] # expected lr if no warming up is performed
@@ -66,8 +86,13 @@ class LrUpdaterHook(Hook):
         ]
 
     def before_train_epoch(self, trainer):
+        if self.warmup_iters is None:
+            epoch_len = len(trainer.data_loader)
+            self.warmup_iters = self.warmup_epochs * epoch_len
+
         if not self.by_epoch:
             return
+
         self.regular_lr = self.get_regular_lr(trainer)
         self._set_lr(trainer, self.regular_lr)
 
@@ -83,13 +108,19 @@ class LrUpdaterHook(Hook):
         elif self.by_epoch:
             if self.warmup is None and cur_iter > self.warmup_iters:
                 return
-            elif cur_iter == self.warmup_iters:
+            elif cur_iter >= self.warmup_iters:
+                print("Im in 1")
+                print("cur_iter:", cur_iter)
+                print("warmup_iters:", self.warmup_iters)
                 self._set_lr(trainer, self.regular_lr)
             else:
+                print("I'm in 2")
+                print("cur_iter:", cur_iter)
+                print("warmup_iters:", self.warmup_iters)
                 warmup_lr = self.get_warmup_lr(cur_iter)
                 self._set_lr(trainer, warmup_lr)
 
-
+@HOOKS.register_module()
 class FixedLrUpdaterHook(LrUpdaterHook):
     def __init__(self, **kwargs):
         super(FixedLrUpdaterHook, self).__init__(**kwargs)
@@ -97,7 +128,19 @@ class FixedLrUpdaterHook(LrUpdaterHook):
     def get_lr(self, trainer, base_lr):
         return base_lr
 
+
+@HOOKS.register_module()
 class StepLrUpdaterHook(LrUpdaterHook):
+    """Step LR scheduler with min_lr clipping.
+    Args:
+        step (int | list[int]): Step to decay the LR. If an int value is given,
+            regard it as the decay interval. If a list is given, decay LR at
+            these steps.
+        gamma (float, optional): Decay LR ratio. Default: 0.1.
+        min_lr (float, optional): Minimum LR value to keep. If LR after decay
+            is lower than `min_lr`, it will be clipped to this value. If None
+            is given, we don't perform lr clipping. Default: None.
+    """
     def __init__(self, step, gamma=0.1, **kwargs):
         assert isinstance(step, (list, int))
         if isinstance(step, list):
@@ -124,7 +167,7 @@ class StepLrUpdaterHook(LrUpdaterHook):
                 break
         return base_lr * self.gamma ** exp
 
-
+@HOOKS.register_module()
 class ExpLrUpdaterHook(LrUpdaterHook):
     def __init__(self, gamma, **kwargs):
         self.gamma = gamma
@@ -134,7 +177,7 @@ class ExpLrUpdaterHook(LrUpdaterHook):
         progress = trainer.epoch if self.by_epoch else trainer.iter
         return base_lr * self.gamma ** progress
 
-
+@HOOKS.register_module()
 class PolyLrUpdaterHook(LrUpdaterHook):
     def __init__(self, power=1., **kwargs):
         self.power = power
@@ -151,7 +194,7 @@ class PolyLrUpdaterHook(LrUpdaterHook):
         return base_lr * (1 - progress / max_progress) ** self.power
 
 
-
+@HOOKS.register_module()
 class InvLrUpdaterHook(LrUpdaterHook):
     def __init__(self, gamma, power=1., **kwargs):
         self.gamma = gamma
@@ -162,7 +205,7 @@ class InvLrUpdaterHook(LrUpdaterHook):
         progress = trainer.epoch if self.by_epoch else trainer.iter
         return base_lr * (1 + self.gamma * progress) ** (-self.power)
 
-
+@HOOKS.register_module()
 class CosineAnnealingLrUpdaterHook(LrUpdaterHook):
     def __init__(self, min_lr=None, min_lr_ratio=None, **kwargs):
         assert (min_lr is None) ^ (min_lr_ratio is None)
@@ -183,7 +226,7 @@ class CosineAnnealingLrUpdaterHook(LrUpdaterHook):
 
         return annealing_cos(base_lr, target_lr, progress / max_progress)
 
-
+@HOOKS.register_module()
 class CosineRestartLrUpdaterHook(LrUpdaterHook):
     """Cosine annealing with restarts learning rate scheme.
     Args:
@@ -234,6 +277,7 @@ class CosineRestartLrUpdaterHook(LrUpdaterHook):
         alpha = min((progress - nearest_restart) / current_periods, 1)
         return annealing_cos(base_lr, target_lr, alpha, current_weight)
 
+@HOOKS.register_module()
 class CyclicLrUpdaterHook(LrUpdaterHook):
     """Cyclic LR Scheduler.
     Implement the cyclical learning rate policy (CLR) described in
@@ -316,7 +360,7 @@ class CyclicLrUpdaterHook(LrUpdaterHook):
                                         progress / (end_iter - start_iter))
 
 
-
+@HOOKS.register_module()
 class OneCycleLrUpdaterHook(LrUpdaterHook):
     """One Cycle LR Scheduler
     The 1cycle learning rate policy changes the learning rate after every
@@ -330,17 +374,17 @@ class OneCycleLrUpdaterHook(LrUpdaterHook):
             of trainer. Default: None.
         pct_start (float): The percentage of the cycle (in number of steps)
             spent increasing the learning rate.
-            Default: 0.3
+            Default: 0.25
         anneal_strategy (str): {'cos', 'linear'}
             Specifies the annealing strategy: 'cos' for cosine annealing,
             'linear' for linear annealing.
             Default: 'cos'
         div_factor (float): Determines the initial learning rate via
             initial_lr = max_lr/div_factor
-            Default: 25
+            Default: 25.
         final_div_factor (float): Determines the minimum learning rate via
             min_lr = initial_lr/final_div_factor
-            Default: 1e4
+            Default: 1e5
         three_phase (bool): If three_phase is True, use a third phase of the
             schedule to annihilate the learning rate according to
             final_div_factor instead of modifying the second phase (the first
@@ -354,8 +398,8 @@ class OneCycleLrUpdaterHook(LrUpdaterHook):
                  total_steps=None,
                  pct_start=0.3,
                  anneal_strategy='cos',
-                 div_factor=25,
-                 final_div_factor=1e4,
+                 div_factor=25.,
+                 final_div_factor=1e5,
                  three_phase=False,
                  **kwargs):
         # validate by_epoch, currently only support by_epoch = False

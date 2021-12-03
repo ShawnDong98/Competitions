@@ -1,7 +1,7 @@
-from .hook import Hook
+from .hook import HOOKS, Hook
 from ..utils import master_only
 
-
+@HOOKS.register_module
 class CheckpointHook(Hook):
     def __init__(
         self,
