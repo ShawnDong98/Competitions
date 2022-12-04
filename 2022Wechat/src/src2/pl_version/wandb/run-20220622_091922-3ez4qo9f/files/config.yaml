@@ -1,0 +1,122 @@
+wandb_version: 1
+
+_wandb:
+  desc: null
+  value:
+    cli_version: 0.12.7
+    framework: huggingface
+    huggingface_version: 4.19.1
+    is_jupyter_run: false
+    is_kaggle_kernel: false
+    m:
+    - 1: trainer/global_step
+      6:
+      - 3
+    - 1: confusion matrix._type
+      5: 1
+      6:
+      - 1
+    - 1: confusion matrix.width
+      5: 1
+      6:
+      - 1
+    - 1: confusion matrix.height
+      5: 1
+      6:
+      - 1
+    - 1: confusion matrix.format
+      5: 1
+      6:
+      - 1
+    - 1: confusion matrix.count
+      5: 1
+      6:
+      - 1
+    - 1: lr-AdamW/pg1
+      5: 1
+      6:
+      - 1
+    - 1: lr-AdamW/pg1-momentum
+      5: 1
+      6:
+      - 1
+    - 1: lr-AdamW/pg2
+      5: 1
+      6:
+      - 1
+    - 1: lr-AdamW/pg2-momentum
+      5: 1
+      6:
+      - 1
+    - 1: train_acc
+      5: 1
+      6:
+      - 1
+    - 1: train_cls_loss
+      5: 1
+      6:
+      - 1
+    - 1: train_mlm_loss
+      5: 1
+      6:
+      - 1
+    - 1: epoch
+      5: 1
+      6:
+      - 1
+    - 1: val_acc
+      5: 1
+      6:
+      - 1
+    - 1: val_cls_loss
+      5: 1
+      6:
+      - 1
+    - 1: mean_f1
+      5: 1
+      6:
+      - 1
+    - 1: lv1_acc
+      5: 1
+      6:
+      - 1
+    - 1: lv2_acc
+      5: 1
+      6:
+      - 1
+    - 1: lv1_f1_micro
+      5: 1
+      6:
+      - 1
+    - 1: lv1_f1_macro
+      5: 1
+      6:
+      - 1
+    - 1: lv2_f1_micro
+      5: 1
+      6:
+      - 1
+    - 1: lv2_f1_macro
+      5: 1
+      6:
+      - 1
+    python_version: 3.7.10
+    start_time: 1655889563
+    t:
+      1:
+      - 1
+      - 5
+      - 9
+      - 11
+      2:
+      - 1
+      - 5
+      - 9
+      - 11
+      3:
+      - 7
+      4: 3.7.10
+      5: 0.12.7
+      6: 4.19.1
+      8:
+      - 5
