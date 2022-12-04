@@ -1,0 +1,54 @@
+batch_size: 2
+iters: 80000
+
+train_dataset:
+  type: Dataset
+  dataset_root: ../datasets/seg_all
+  train_path: ../datasets/seg_all/train_all.txt
+  num_classes: 4
+  transforms:
+    # - type: SubImgCrop
+    #   offset_top: 160
+    - type: LaneRandomRotation
+      max_rotation: 10
+      im_padding_value: [0, 0, 0]
+      label_padding_value: 0
+      keeping_size: True
+    - type: RandomHorizontalFlip
+    - type: Resize
+      target_size: [608, 608]
+    - type: RandomDistort
+      brightness_range: 0.25
+      brightness_prob: 1
+      contrast_range: 0.25
+      contrast_prob: 1
+      saturation_range: 0.25
+      saturation_prob: 1
+      hue_range: 63
+      hue_prob: 1
+    - type: RandomNoise
+    - type: Normalize
+      mean: [0.485, 0.456, 0.406]
+      std: [0.229, 0.224, 0.225]
+      # mean: [0.0, 0.0, 0.0]
+      # std: [1.0, 1.0, 1.0]
+  mode: train
+
+
+val_dataset:
+  type: Dataset
+  dataset_root: ../datasets/seg_all
+  val_path: ../datasets/seg_all/val.txt
+  num_classes: 4
+  transforms:
+    # - type: SubImgCrop
+    #   offset_top: 160
+    - type: Resize
+      target_size: [608, 608]
+    - type: Normalize
+      mean: [0.485, 0.456, 0.406]
+      std: [0.229, 0.224, 0.225]
+      # mean: [0.0, 0.0, 0.0]
+      # std: [1.0, 1.0, 1.0]
+
+  mode: val

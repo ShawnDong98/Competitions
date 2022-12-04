@@ -1,0 +1,1 @@
+python tools/evaluate.py configs/yolov5/yolov5_s.yml ./output/yolov5_s/0.pdparams

@@ -1,0 +1,1 @@
+python3 export.py --config configs/pra2022/bisenetv2.yml --model_path output/best_model/model.pdparams

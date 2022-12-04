@@ -1,0 +1,73 @@
+_BASE_: [
+  '../datasets/pra2022_detection.yml',
+  '../runtime.yml',
+  '_base_/yolov5_reader.yml',
+]
+log_iter: 20
+snapshot_epoch: 1
+weights: output/yolov5_convnext/model_final
+pretrain_weights: ../pretrained_weights/det/yolov5_convnext_s_36e_coco.pdparams
+
+architecture: YOLOv5
+norm_type: sync_bn
+use_ema: True
+ema_decay: 0.9999
+ema_decay_type: "exponential"
+act: silu
+find_unused_parameters: True
+
+depth_mult: 0.33
+width_mult: 0.50
+
+
+YOLOv5:
+  backbone: ConvNeXt
+  neck: YOLOCSPPAN
+  yolo_head: YOLOv5Head
+  post_process: ~
+
+ConvNeXt:
+  arch: 'tiny'
+  drop_path_rate: 0.4
+  layer_scale_init_value: 1.0
+  return_idx: [1, 2, 3]
+
+YOLOCSPPAN:
+  depthwise: false
+
+YOLOv5Head:
+  anchors: [[7, 16], [18, 24], [12, 44], 
+            [32, 40], [24, 88], [52, 65], 
+            [77, 120], [129, 176], [184, 318]]
+  anchor_masks: [[0, 1, 2], [3, 4, 5], [6, 7, 8]]
+  stride: [8, 16, 32]
+  loss: YOLOv5Loss
+  nms:
+    name: MultiClassNMS
+    nms_top_k: 1000
+    keep_top_k: 100
+    score_threshold: 0.01
+    nms_threshold: 0.45
+
+YOLOv5Loss:
+  downsample_ratios: [8, 16, 32]
+  balance: [4.0, 1.0, 0.4]
+  box_weight: 0.05
+  obj_weight: 1.0
+  cls_weght: 0.5
+
+
+epoch: 80
+LearningRate:
+  base_lr: 0.0002
+  schedulers:
+  - !PiecewiseDecay
+    gamma: 0.1
+    milestones: [86]
+    use_warmup: false
+
+OptimizerBuilder:
+  regularizer: false
+  optimizer:
+    type: AdamW
+    weight_decay: 0.0005

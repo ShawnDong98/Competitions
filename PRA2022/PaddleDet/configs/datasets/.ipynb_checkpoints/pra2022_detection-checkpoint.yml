@@ -1,0 +1,19 @@
+metric: COCO
+num_classes: 7
+
+TrainDataset:
+  !COCODataSet
+    image_dir: images
+    anno_path: train_all_cp.json
+    dataset_dir: ../datasets/copy_paste/
+    data_fields: ['image', 'gt_bbox', 'gt_class', 'is_crowd']
+
+EvalDataset:
+  !COCODataSet
+    image_dir: images
+    anno_path: val.json
+    dataset_dir: ../datasets/copy_paste/
+
+TestDataset:
+  !CustomImageFolder
+    sample_num: -1

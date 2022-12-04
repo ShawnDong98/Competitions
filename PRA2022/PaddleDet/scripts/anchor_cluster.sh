@@ -1,0 +1,1 @@
+python tools/anchor_cluster.py -c configs/yolov3/yolov3_pra2022.yml -n 9 -s 608 -m v2 -i 1000

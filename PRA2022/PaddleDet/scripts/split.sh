@@ -1,0 +1,1 @@
+python cocosplit/cocosplit.py --having-annotations -s 0.8 datasets/HSI/all.json train.json test.json

@@ -1,0 +1,1 @@
+python3 -m paddle.distributed.launch train.py --config configs/pra2022/topformer.yml --do_eval --save_interval 400
