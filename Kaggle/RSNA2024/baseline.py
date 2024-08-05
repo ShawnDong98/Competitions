@@ -77,7 +77,7 @@ class RSNA24Dataset(Dataset):
         x = np.zeros(self.image_shape, dtype=np.uint8)
         t = self.df.iloc[idx]
         st_id = int(t['study_id'])
-        label = t[1:].values.astype(np.int64)
+        label = t[1:].values.astype(np.int32)
 
         # Sagittal T1
         allimgs_st1 = self.get_img_paths(st_id, 'Sagittal T1')
