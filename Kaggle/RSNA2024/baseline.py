@@ -272,7 +272,6 @@ if __name__ == '__main__':
         df = train_df, 
         series_desc_df = train_series_desc,
         image_shape = (512, 512, 30), 
-        phase = "train",
     )
     print(dataset[0])
 
