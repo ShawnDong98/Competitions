@@ -252,6 +252,7 @@ class RSNA24Model(nn.Module):
                                     )
     
     def forward(self, x):
+        print(type(x))
         y = self.model(x)
         return y
     
