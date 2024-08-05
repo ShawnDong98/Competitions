@@ -274,7 +274,7 @@ if __name__ == '__main__':
         image_shape = (512, 512, 30), 
     )
 
-    BS= 16
+    BS= 32
     train_loader = DataLoader(
             dataset,
             batch_size=BS,
@@ -286,7 +286,7 @@ if __name__ == '__main__':
 
     val_loader = DataLoader(
             dataset,
-            batch_size=1,
+            batch_size=BS*2,
             shuffle=False,
             pin_memory=True,
             drop_last=False,
