@@ -262,7 +262,7 @@ class RSNA24Model(nn.Module):
 
 
 if __name__ == '__main__':
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cuda" if torch.cuda.is_available() else "mps")
     root_dir = "../../datasets/Kaggle/RSNA2024/"
     train_df = pd.read_csv(os.path.join(root_dir, 'train.csv'))
     train_series_desc = pd.read_csv(os.path.join(root_dir, "train_series_descriptions.csv"))
@@ -274,7 +274,6 @@ if __name__ == '__main__':
         series_desc_df = train_series_desc,
         image_shape = (512, 512, 30), 
     )
-    print(dataset[0])
 
     train_loader = DataLoader(
             dataset,
@@ -300,7 +299,7 @@ if __name__ == '__main__':
 
     N_LABELS = 25
 
-    model = RSNA24Model('convnext_base_384_in22ft1k', in_c=30, n_classes=N_LABELS*3, pretrained=False)
+    model = RSNA24Model('tf_efficientnet_b3.ns_jft_in1k', in_c=30, n_classes=N_LABELS*3, pretrained=False)
 
     model.to(device)
 
@@ -323,7 +322,7 @@ if __name__ == '__main__':
     best_wll = 1.2
     es_step = 0
 
-    USE_AMP = True
+    USE_AMP = False
 
     autocast = torch.cuda.amp.autocast(enabled=USE_AMP, dtype=torch.half) # you can use with T4 gpu. or newer
 
