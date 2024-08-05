@@ -274,9 +274,10 @@ if __name__ == '__main__':
         image_shape = (512, 512, 30), 
     )
 
+    BS= 16
     train_loader = DataLoader(
             dataset,
-            batch_size=1,
+            batch_size=BS,
             shuffle=True,
             pin_memory=True,
             drop_last=False,
@@ -328,7 +329,9 @@ if __name__ == '__main__':
 
     scaler = torch.cuda.amp.GradScaler(enabled=USE_AMP, init_scale=4096)
 
-    OUTPUT_DIR = "save"
+    OUTPUT_DIR = f"convnext_bs{BS}"
+    if not os.path.exists(OUTPUT_DIR):
+        os.makedirs(OUTPUT_DIR)
 
     for epoch in range(1, EPOCHS+1):
         print(f'start epoch {epoch}')
