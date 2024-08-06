@@ -273,11 +273,14 @@ if __name__ == '__main__':
         series_desc_df = train_series_desc,
         image_shape = (512, 512, 30), 
     )
+    GRAD_ACC = 2
+    TGT_BATCH_SIZE = 128    
+    BATCH_SIZE = TGT_BATCH_SIZE // GRAD_ACC
+    LR = 2e-4 * TGT_BATCH_SIZE / 32
 
-    BS= 32
     train_loader = DataLoader(
             dataset,
-            batch_size=BS,
+            batch_size=BATCH_SIZE,
             shuffle=True,
             pin_memory=True,
             drop_last=False,
@@ -286,7 +289,7 @@ if __name__ == '__main__':
 
     val_loader = DataLoader(
             dataset,
-            batch_size=BS*2,
+            batch_size=BATCH_SIZE*2,
             shuffle=False,
             pin_memory=True,
             drop_last=False,
@@ -306,13 +309,19 @@ if __name__ == '__main__':
 
     EPOCHS = 20
 
-    optimizer = AdamW(model.parameters(), lr=2e-4, weight_decay=1e-2)
+    LR = 2e-4 * TGT_BATCH_SIZE / 32
+    WD = 1e-2
+    
+    optimizer = AdamW(model.parameters(), lr=LR, weight_decay=WD)
 
-    warmup_steps = EPOCHS/10 * len(train_loader) 
-    num_total_steps = EPOCHS * len(train_loader)
+    warmup_steps = EPOCHS/10 * len(train_loader) // GRAD_ACC
+    num_total_steps = EPOCHS * len(train_loader) // GRAD_ACC
+    num_cycles = 0.475
     scheduler = get_cosine_schedule_with_warmup(optimizer,
                                                 num_warmup_steps=warmup_steps,
-                                                num_training_steps=num_total_steps)
+                                                num_training_steps=num_total_steps,
+                                                num_cycles=num_cycles
+    )
     
 
     weights = torch.tensor([1.0, 2.0, 4.0])
@@ -323,13 +332,13 @@ if __name__ == '__main__':
     best_wll = 1.2
     es_step = 0
 
-    USE_AMP = False
+    USE_AMP = True
 
     autocast = torch.cuda.amp.autocast(enabled=USE_AMP, dtype=torch.half) # you can use with T4 gpu. or newer
 
     scaler = torch.cuda.amp.GradScaler(enabled=USE_AMP, init_scale=4096)
 
-    OUTPUT_DIR = f"convnext_bs{BS}"
+    OUTPUT_DIR = f"convnext_bs{BATCH_SIZE}"
     if not os.path.exists(OUTPUT_DIR):
         os.makedirs(OUTPUT_DIR)
 
@@ -351,6 +360,10 @@ if __name__ == '__main__':
                         gt = t[:,col]
                         loss = loss + criterion(pred, gt) / N_LABELS
 
+                    total_loss += loss.item()
+                    if GRAD_ACC > 1:
+                        loss = loss / GRAD_ACC
+
                 pbar.set_postfix(
                     OrderedDict(
                         loss=f'{loss.item():.6f}',
@@ -361,11 +374,12 @@ if __name__ == '__main__':
 
                 torch.nn.utils.clip_grad_norm_(model.parameters(), 1e9)
 
-                scaler.step(optimizer)
-                scaler.update()
-                optimizer.zero_grad()
-                if scheduler is not None:
-                    scheduler.step()  
+                if (idx + 1) % GRAD_ACC == 0:
+                    scaler.step(optimizer)
+                    scaler.update()
+                    optimizer.zero_grad()
+                    if scheduler is not None:
+                        scheduler.step()  
 
         train_loss = total_loss/len(train_loader)
         print(f'train_loss:{train_loss:.6f}')
