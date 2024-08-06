@@ -274,7 +274,7 @@ if __name__ == '__main__':
         image_shape = (512, 512, 30), 
     )
     GRAD_ACC = 2
-    TGT_BATCH_SIZE = 128    
+    TGT_BATCH_SIZE = 64    
     BATCH_SIZE = TGT_BATCH_SIZE // GRAD_ACC
     LR = 2e-4 * TGT_BATCH_SIZE / 32
 
