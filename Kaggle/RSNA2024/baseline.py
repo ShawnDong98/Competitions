@@ -9,8 +9,8 @@ from torch.utils.data import Dataset, DataLoader
 from torch.optim import AdamW
 from transformers import get_cosine_schedule_with_warmup
 
-
 import timm
+import albumentations as A
 
 import cv2
 import numpy as np
@@ -169,7 +169,7 @@ class RSNA24TestDataset(Dataset):
     def read_dcm_ret_arr(self, src_path):
         dicom_data = pydicom.dcmread(src_path)
         image = dicom_data.pixel_array
-        image = (image - image.min()) / (image.max() - image.min() + 1e-6)
+        image = (image - image.min()) / (image.max() - image.min() + 1e-6) * 255
         img = cv2.resize(image, (self.image_shape[0], self.image_shape[1]),interpolation=cv2.INTER_CUBIC)
         assert img.shape==(self.image_shape[0], self.image_shape[1])
         return img
@@ -267,19 +267,60 @@ if __name__ == '__main__':
     train_series_desc = pd.read_csv(os.path.join(root_dir, "train_series_descriptions.csv"))
     label2id = {'Normal/Mild': 0, 'Moderate':1, 'Severe':2}
     train_df = train_df.replace(label2id)
-    dataset = RSNA24Dataset(
+
+    image_shape = (512, 512, 30)
+
+    AUG_PROB = 0.75
+
+    transforms_train = A.Compose([
+        A.RandomBrightnessContrast(brightness_limit=(-0.2, 0.2), contrast_limit=(-0.2, 0.2), p=AUG_PROB),
+        A.OneOf([
+            A.MotionBlur(blur_limit=5),
+            A.MedianBlur(blur_limit=5),
+            A.GaussianBlur(blur_limit=5),
+            A.GaussNoise(var_limit=(5.0, 30.0)),
+        ], p=AUG_PROB),
+
+        A.OneOf([
+            A.OpticalDistortion(distort_limit=1.0),
+            A.GridDistortion(num_steps=5, distort_limit=1.),
+            A.ElasticTransform(alpha=3),
+        ], p=AUG_PROB),
+
+        A.ShiftScaleRotate(shift_limit=0.1, scale_limit=0.1, rotate_limit=15, border_mode=0, p=AUG_PROB),
+        A.Resize(image_shape[0], image_shape[1]),
+        A.CoarseDropout(max_holes=16, max_height=64, max_width=64, min_holes=1, min_height=8, min_width=8, p=AUG_PROB),    
+        A.Normalize(mean=0.5, std=0.5)
+    ])
+
+    transforms_val = A.Compose([
+        A.Resize(image_shape[0], image_shape[1]),
+        A.Normalize(mean=0.5, std=0.5)
+    ])
+
+
+    train_dataset = RSNA24Dataset(
         root_dir = root_dir,
         df = train_df, 
         series_desc_df = train_series_desc,
-        image_shape = (512, 512, 30), 
+        image_shape = image_shape, 
+        transform = transforms_train
+    )
+
+    val_dataset = RSNA24Dataset(
+        root_dir = root_dir,
+        df = train_df, 
+        series_desc_df = train_series_desc,
+        image_shape = image_shape, 
+        transform = transforms_val
     )
     GRAD_ACC = 2
-    TGT_BATCH_SIZE = 64    
+    TGT_BATCH_SIZE = 112
     BATCH_SIZE = TGT_BATCH_SIZE // GRAD_ACC
     LR = 2e-4 * TGT_BATCH_SIZE / 32
 
     train_loader = DataLoader(
-            dataset,
+            train_dataset,
             batch_size=BATCH_SIZE,
             shuffle=True,
             pin_memory=True,
@@ -288,7 +329,7 @@ if __name__ == '__main__':
     )
 
     val_loader = DataLoader(
-            dataset,
+            val_dataset,
             batch_size=BATCH_SIZE*2,
             shuffle=False,
             pin_memory=True,
